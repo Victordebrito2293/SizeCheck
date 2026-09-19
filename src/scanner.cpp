@@ -69,6 +69,32 @@ bool is_path_within(const std::filesystem::path &candidate,
   return root_it == root.end();
 }
 
+// Some platforms (notably Windows reparse points) do not fully resolve
+// certain directory links through weak_canonical/status.  When resolution
+// fails, re-read the raw link text: a link that points into a real directory
+// is still skipped, and only genuinely broken or looping links are errors.
+Result<std::optional<byte_count>> link_from_raw_target_or_error(
+    const std::filesystem::path &link) {
+  std::error_code ec;
+  const std::filesystem::path raw = std::filesystem::read_symlink(link, ec);
+  if (ec) {
+    return Result<std::optional<byte_count>>::err(make_error(ec));
+  }
+
+  std::filesystem::path candidate = raw;
+  if (candidate.is_relative()) {
+    candidate = link.parent_path() / candidate;
+  }
+  const std::filesystem::file_status candidate_status =
+      std::filesystem::status(candidate, ec);
+  if (!ec &&
+      candidate_status.type() == std::filesystem::file_type::directory) {
+    return Result<std::optional<byte_count>>::ok(std::nullopt);
+  }
+  return Result<std::optional<byte_count>>::err(
+      make_error_message("broken symbolic link"));
+}
+
 Result<std::optional<byte_count>> symlink_counted_size(
     const std::filesystem::path &link,
     const std::filesystem::path &canonical_root) {
@@ -76,8 +102,9 @@ Result<std::optional<byte_count>> symlink_counted_size(
   const std::filesystem::path resolved =
       std::filesystem::weakly_canonical(link, ec);
   if (ec) {
-    // A dangling or looping link: report an access error.
-    return Result<std::optional<byte_count>>::err(make_error(ec));
+    // A dangling or looping link: report an access error, unless the raw
+    // target turns out to be a skipped directory on this platform.
+    return link_from_raw_target_or_error(link);
   }
 
   const std::filesystem::file_status target_status =
@@ -85,9 +112,7 @@ Result<std::optional<byte_count>> symlink_counted_size(
   const auto target_type = target_status.type();
   if (ec || target_type == std::filesystem::file_type::not_found ||
       target_type == std::filesystem::file_type::none) {
-    // The link resolves inside the tree but its target cannot be stat'ed.
-    return Result<std::optional<byte_count>>::err(
-        ec ? make_error(ec) : make_error_message("broken symbolic link"));
+    return link_from_raw_target_or_error(link);
   }
 
   if (target_type == std::filesystem::file_type::directory) {
