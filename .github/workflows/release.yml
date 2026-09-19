@@ -1,0 +1,85 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    name: Package (${{ matrix.platform }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux
+            os: ubuntu-latest
+            binary: build/sizecheck
+            ext: ''
+          - platform: macos
+            os: macos-latest
+            binary: build/sizecheck
+            ext: ''
+          - platform: windows
+            os: windows-latest
+            binary: build/Release/sizecheck.exe
+            ext: .exe
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Test
+        run: ctest --test-dir build -C Release --output-on-failure
+
+      - name: Stage binary
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp "${{ matrix.binary }}" "dist/sizecheck-${{ matrix.platform }}-${{ runner.arch }}${{ matrix.ext }}"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sizecheck-${{ matrix.platform }}
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    name: Create GitHub Release
+    needs: package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Attach binaries
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*/*
+          fail_on_unmatched_files: true
+          body: |
+            Binaries:
+
+            | Platform | Binary |
+            | -------- | ------ |
+            | Linux (x86_64) | `sizecheck-linux-X64` |
+            | Linux (ARM64) | `sizecheck-linux-ARM64` |
+            | macOS (x86_64) | `sizecheck-macos-X64` |
+            | macOS (ARM64) | `sizecheck-macos-ARM64` |
+            | Windows (x86_64) | `sizecheck-windows-X64.exe` |
+            | Windows (ARM64) | `sizecheck-windows-ARM64.exe` |
+
+            Build from source: `cmake -S . -B build && cmake --build build`.
