@@ -31,4 +31,3 @@ Checks: >
   -bugprone-suspicious-include
 WarningsAsErrors: ''
 HeaderFilterRegex: '.*'
-AnalyzeTemporaryDtors: false

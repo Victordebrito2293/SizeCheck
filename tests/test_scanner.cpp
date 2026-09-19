@@ -292,8 +292,7 @@ TEST("scanner symlink loop terminates") {
 
   // The scan must terminate; the loop is either reported as an error or
   // counted as a link, but it must never hang or crash.
-  CHECK(outcome.summary.stats.access_errors >= static_cast<std::uint64_t>(0));
-  CHECK(outcome.summary.stats.files >= static_cast<std::uint64_t>(0));
+  CHECK(outcome.summary.stats.files + outcome.summary.stats.access_errors > 0);
 }
 
 TEST("scanner permission denied on directory is reported") {
