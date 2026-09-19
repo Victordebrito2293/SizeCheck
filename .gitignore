@@ -1,0 +1,38 @@
+# ---- Build directories ------------------------------------------------------
+build*/
+out/
+cmake-build-*/
+
+# ---- CMake generated files --------------------------------------------------
+CMakeCache.txt
+CMakeFiles/
+compile_commands.json
+cmake_install.cmake
+CTestTestfile.cmake
+DartConfiguration.tcl
+CTestConfig.cmake
+Testing/
+install_manifest.txt
+
+# ---- Compiler artifacts -----------------------------------------------------
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dylib
+*.exe
+*.dll
+*.pdb
+*.gcda
+*.gcno
+
+# ---- Fuzzer artifacts -------------------------------------------------------
+fuzz_corpus/
+
+# ---- Editor / OS noise ------------------------------------------------------
+.DS_Store
+*.swp
+*~
+.idea/
+.vscode/
